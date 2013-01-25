@@ -1,0 +1,41 @@
+#Used to create urls_data
+CREATE EXTERNAL TABLE urls_data (ts string, ip string, url string) ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t' LOCATION '/user/hdfs/urls_data' ;
+
+#Used to create host counts table
+CREATE TABLE host_counts (ts STRING,ip STRING, host STRING, count INT);
+
+#Used to count 
+INSERT OVERWRITE TABLE host_counts SELECT ts, ip, url, count(*) AS total FROM urls_data GROUP BY ts, ip, url SORT BY total DESC;
+
+#When were cricket matches
+SELECT ts, count(*) AS total FROM host_counts WHERE host="com.cricbuzz" OR host="com.cricinfo" OR host="com.yahoo.cricket" GROUP BY ts ORDER BY total DESC;
+
+#Least productive day 
+SELECT ts, count(*) AS total FROM host_counts WHERE host="com.facebook" OR host="com.youtube" GROUP BY ts ORDER BY total DESC;
+
+#When were most news read 
+SELECT ts, count(*) AS total FROM host_counts WHERE host="com.timesofindia" OR host="com.yahoo" OR host="com.ibnlive" OR host="com.nytimes.com" OR host="com.bbc" GROUP BY ts ORDER BY total DESC;
+
+#When were we busy with masalamind and agor.it/sweetrelish.com
+SELECT ts, count(*) AS total FROM host_counts WHERE host="com.sweetrelish" OR host="com.masalaminds" OR host="it.agor" GROUP BY ts ORDER BY total DESC;
+
+#When were mails opens a lot 
+SELECT ts, count(*) AS total FROM host_counts WHERE host="com.gmail" OR host="com.hotmail" OR host="com.yahoo" GROUP BY ts ORDER BY total DESC;
+
+#When did people visit stackoverflow the most
+SELECT ts, count(*) AS total FROM host_counts WHERE host="com.stackoverflow" GROUP BY ts ORDER BY total DESC;
+
+#Aggregate daily counts for hosts
+SELECT ts, host, count(*) as total FROM host_counts GROUP BY ts, host ORDER BY total DESC;
+
+#Create index of Sites Visitation
+CREATE TABLE site_idx(host STRING, uniqs ARRAY<STRING>);
+
+#Generate index of sites visited by users
+INSERT OVERWRITE TABLE site_idx SELECT agg_host_counts.host, agg_host_counts.uniqs FROM (SELECT host, COLLECT_SET(ip) AS uniqs FROM host_counts GROUP BY host) agg_host_counts WHERE size(agg_host_counts.uniqs) > 3;
+
+#Calculate Total Number of Co-ocurrances
+SELECT user1,user2,COUNT(1) as overlap FROM site_idx LATERAL VIEW EXPLODE(uniqs) t1 as user1 LATERAL VIEW explode(uniqs) t2 as user2 WHERE user1 <> user2 AND user1="192.168.2.38" GROUP BY user1,user2 ORDER BY overlap DESC ;
+
+#Report of hosts by max number of different ips
+SELECT host,SIZE(uniqs) AS total FROM site_idx ORDER BY total DESC LIMIT 100; 

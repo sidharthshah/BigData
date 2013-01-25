@@ -39,3 +39,12 @@ SELECT user1,user2,COUNT(1) as overlap FROM site_idx LATERAL VIEW EXPLODE(uniqs)
 
 --Report of hosts by max number of different ips
 SELECT host,SIZE(uniqs) AS total FROM site_idx ORDER BY total DESC LIMIT 100; 
+
+--Create daily host counts table
+CREATE TABLE daily_host_counts (ts STRING, host STRING, freq INT);
+
+--Generate Time series by day for each of hosts
+INSERT OVERWRITE TABLE daily_host_counts SELECT ts, url, COUNT(1) FROM urls_data GROUP BY ts, url;
+
+--Fetch time series for Facebook
+SELECT * FROM daily_host_counts WHERE host="com.facebook" ORDER BY ts;
